@@ -93,8 +93,8 @@ void running_run::split()
 
 void database::update_best_segments(const run& run)
 {
-    for(auto i = 0u; i < sizeof(run::segments) / sizeof(run_segment); i++) {
-        if (best_segments.segments[i].frames < 0 || best_segments.segments[i].frames > run.segments[i].frames)
+    for(auto i = 0u; i < NUM_SEGMENTS; i++) {
+        if (best_segments.segments[i].frames < 0 || (best_segments.segments[i].frames > run.segments[i].frames && run.segments[i].frames > 0))
             best_segments.segments[i].frames = run.segments[i].frames;
     }
 }
