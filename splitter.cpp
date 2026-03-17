@@ -11,6 +11,8 @@
 #include <print>
 #include <vector>
 
+#include <zlib.h>
+
 // header
 
 struct run_segment
@@ -119,102 +121,117 @@ void database::save_run(const run& r)
     save_to_disk();
 }
 
+constexpr static const char* FILENAME = "runs.db.gz";
+
 void database::save_to_disk()
 {
-    std::ofstream out("splits.bin", std::ios::binary | std::ios::trunc);
-    if (!out.is_open()) {
-        std::println(stderr, "Failed to open splits.bin for writing");
+    gzFile file = gzopen(FILENAME, "wb9");  // wb = write binary, 9 = best compression
+    if (!file) {
+        std::println(stderr, "Failed to create compressed file {}", FILENAME);
         return;
     }
 
-    // 1. Number of runs
     uint64_t count = runs.size();
-    out.write(reinterpret_cast<const char*>(&count), sizeof(count));
+
+    // 1. Number of runs
+    gzwrite(file, &count, sizeof(count));
 
     // 2. Each run
     for (const auto& r : runs)
     {
         // started_at
-        out.write(reinterpret_cast<const char*>(&r.started_at), sizeof(r.started_at));
+        gzwrite(file, &r.started_at, sizeof(r.started_at));
 
         // did_finish (1 byte)
         uint8_t finish_byte = r.did_finish ? 1 : 0;
-        out.write(reinterpret_cast<const char*>(&finish_byte), sizeof(finish_byte));
+        gzwrite(file, &finish_byte, sizeof(finish_byte));
 
-        // 10 segments
+        // segments
         for (int i = 0; i < NUM_SEGMENTS; ++i) {
-            out.write(reinterpret_cast<const char*>(&r.segments[i].frames),
-                      sizeof(r.segments[i].frames));
+            gzwrite(file, &r.segments[i].frames, sizeof(r.segments[i].frames));
         }
     }
 
-    out.close();
-
-    if (out.good()) {
-        std::println(stderr, "Saved {} runs to splits.bin", count);
-    } else {
-        std::println(stderr, "Error writing to splits.bin");
+    int err = gzclose(file);
+    if (err != Z_OK) {
+        std::println(stderr, "Error closing compressed file {} (gzerror = {})", 
+                     FILENAME, gzerror(file, &err));
+        return;
     }
+
+    std::println(stderr, "Saved {} runs to {}", count, FILENAME);
 }
+
+// ────────────────────────────────────────────────
 
 void database::load_from_disk()
 {
-    std::ifstream in("splits.bin", std::ios::binary);
-    if (!in.is_open()) {
-        std::println(stderr, "No splits.bin found - starting with empty database");
+    gzFile file = gzopen(FILENAME, "rb");
+    if (!file) {
+        std::println(stderr, "No {} found - starting with empty database", FILENAME);
         runs.clear();
         return;
     }
 
     runs.clear();
 
-    // 1. Read count
     uint64_t count = 0;
-    in.read(reinterpret_cast<char*>(&count), sizeof(count));
-
-    if (in.fail() || count > 1'000'000) {  // arbitrary sane limit
-        std::println(stderr, "Corrupted or invalid splits.bin (bad count)");
+    if (gzread(file, &count, sizeof(count)) != sizeof(count)) {
+        std::println(stderr, "Failed to read run count from {}", FILENAME);
+        gzclose(file);
         return;
     }
 
-    runs.reserve(count);
+    if (count > 1'000'000) {
+        std::println(stderr, "Unreasonable run count ({} > 1M) - assuming corruption", count);
+        gzclose(file);
+        return;
+    }
+
+    runs.resize(count);
+
     for (uint64_t i = 0; i < count; ++i)
     {
-        run r;
+        run& r = runs[i];
 
         // started_at
-        in.read(reinterpret_cast<char*>(&r.started_at), sizeof(r.started_at));
+        if (gzread(file, &r.started_at, sizeof(r.started_at)) != sizeof(r.started_at)) {
+            std::println(stderr, "Corrupted data at run #{} in {}", i + 1, FILENAME);
+            exit(1);
+        }
 
         // did_finish
         uint8_t finish_byte = 0;
-        in.read(reinterpret_cast<char*>(&finish_byte), sizeof(finish_byte));
+        if (gzread(file, &finish_byte, sizeof(finish_byte)) != sizeof(finish_byte)) {
+            std::println(stderr, "Corrupted data at run #{} in {}", i + 1, FILENAME);
+            exit(1);
+        }
         r.did_finish = (finish_byte != 0);
 
+        // segments
         for (int s = 0; s < NUM_SEGMENTS; ++s) {
-            in.read(reinterpret_cast<char*>(&r.segments[s].frames),
-                    sizeof(r.segments[s].frames));
-            if (best_segments.segments[s].frames < 0 || (r.segments[s].frames < best_segments.segments[s].frames && r.segments[s].frames > 0))
+            if (gzread(file, &r.segments[s].frames, sizeof(r.segments[s].frames)) != sizeof(r.segments[s].frames)) {
+                std::println(stderr, "Corrupted data at run #{} in {}", i + 1, FILENAME);
+                exit(1);
+            }
+
+            // update best segments
+            if (best_segments.segments[s].frames < 0 ||
+                (r.segments[s].frames < best_segments.segments[s].frames &&
+                 r.segments[s].frames > 0))
+            {
                 best_segments.segments[s].frames = r.segments[s].frames;
+            }
         }
 
-        if (in.fail()) {
-            std::println(stderr, "Corrupted data at run #{}", i + 1);
-            break;
-        }
-
-        runs.emplace_back(std::move(r));
-
-        if (r.did_finish && (!pb.has_value() ||  r.total_frames() < pb.value().total_frames()))
+        // update personal best
+        if (r.did_finish && (!pb.has_value() || r.total_frames() < pb.value().total_frames()))
             pb = r;
     }
 
-    in.close();
+    gzclose(file);
 
-    if (in.eof() || in.fail()) {
-        std::println(stderr, "Warning: splits.bin ended unexpectedly");
-    }
-
-    std::println(stderr, "Loaded {} runs from splits.bin", runs.size());
+    std::println(stderr, "Loaded {} runs from {}", runs.size(), FILENAME);
 }
 
 std::optional<run> comparing_to;
