@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<text>
+	<languageurl>
+		0
+	</languageurl>
+	<LOADING>Loading</LOADING>
+	<PLAY>Play</PLAY>
+	<INTRO>At the entrance to Hogwarts castle, Lord Voldemort has sent his evil followers to attack the school! Can Harry and his friends save the day?</INTRO>
+	<LEVEL>Level</LEVEL>
+	<RESTART>Try Again</RESTART>
+	<QUIT>Menu</QUIT>
+	<MOVE_TIP>ARROW KEYS to move!</MOVE_TIP>
+	<JUMP_TIP>Press UP to jump</JUMP_TIP>
+	<DOUBLE_JUMP_TIP>Press UP twice to double-jump</DOUBLE_JUMP_TIP>
+	<DEMENTORS>Watch out for the DEMENTORS, Harry!</DEMENTORS>
+	<JUMPS>Time your jumps carefully!</JUMPS>
+	<GOYLE>Watch out for GREGORY GOYLE!</GOYLE>
+	<HORCRUX>Collect the HORCRUX...</HORCRUX>
+	<GAME_OVER>Game Over</GAME_OVER>
+	<LOSE_BODY>Play again to defeat Voldemort at the Battle for Hogwarts!</LOSE_BODY>
+	<LEVEL_REACHED>You got to level</LEVEL_REACHED>
+	<CONTINUE>Play Again</CONTINUE>
+	<YOU_WIN>You Win</YOU_WIN>
+	<!--EDIT CAREFULLY--><WIN_MESSAGE>Final Time: </WIN_MESSAGE><!--EDIT CAREFULLY-->
+</text>
