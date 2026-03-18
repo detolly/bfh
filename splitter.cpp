@@ -52,8 +52,8 @@ struct database
     const run& get_best_segments() { return best_segments; }
     const std::optional<run>& get_pb() { return pb; }
     void save_run(const run& run);
-    void update_best_segments(const run& run);
-    void update_pb_if_necessary(const run& run);
+    bool update_best_segments(const run& run);
+    bool update_pb_if_necessary(const run& run);
 
     void save_to_disk();
     void load_from_disk();
@@ -92,18 +92,26 @@ void running_run::split()
         finished = true;
 }
 
-void database::update_best_segments(const run& run)
+bool database::update_best_segments(const run& run)
 {
+    bool did_update = false;
     for(auto i = 0u; i < NUM_SEGMENTS; i++) {
-        if (best_segments.segments[i].frames < 0 || (best_segments.segments[i].frames > run.segments[i].frames && run.segments[i].frames > 0))
+        if (best_segments.segments[i].frames < 0 || (best_segments.segments[i].frames > run.segments[i].frames && run.segments[i].frames > 0)) {
             best_segments.segments[i].frames = run.segments[i].frames;
+            did_update = true;
+        }
     }
+    return did_update;
 }
 
-void database::update_pb_if_necessary(const run& run)
+bool database::update_pb_if_necessary(const run& run)
 {
-    if (!pb.has_value() || run.total_frames() < pb.value().total_frames())
+    if (!pb.has_value() || run.total_frames() < pb.value().total_frames()) {
         pb = run;
+        return true;
+    }
+
+    return false;
 }
 
 void database::save_run(const run& r)
@@ -112,12 +120,14 @@ void database::save_run(const run& r)
 
     runs.push_back(r);
     const auto& new_run = runs.back();
-    update_best_segments(new_run);
+
+    bool should_save = update_best_segments(new_run);
 
     if (r.did_finish)
-        update_pb_if_necessary(new_run);
+        should_save = update_pb_if_necessary(new_run) || should_save;
 
-    save_to_disk();
+    if (should_save)
+        save_to_disk();
 }
 
 constexpr static const char* FILENAME = "runs.db.gz";
@@ -477,4 +487,5 @@ int main()
 {
     database::instance.load_from_disk();
     socket_thread();
+    database::instance.save_to_disk();
 }
