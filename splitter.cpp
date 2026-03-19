@@ -1,11 +1,10 @@
-#include <arpa/inet.h>
-#include <cassert>
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <cstdint>
 #include <print>
 #include <vector>
