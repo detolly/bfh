@@ -247,10 +247,10 @@ running_run current_run;
 constexpr const char* BOLD_YELLOW = "\033[1;33m";
 constexpr const char* GREEN  = "\033[32m";
 constexpr const char* RED    = "\033[31m";
-constexpr const char* GRAY   = "\033[90m";
+// constexpr const char* GRAY   = "\033[90m";
 constexpr const char* CYAN   = "\033[36m";
 constexpr const char* RESET  = "\033[0m";
-constexpr const char* BOLD   = "\033[1m";
+// constexpr const char* BOLD   = "\033[1m";
 
 void print_table()
 {
@@ -382,13 +382,18 @@ void print_run()
     for (uint32_t i = 0; i < current_run.current_segment; ++i)
         total_frames += current_run.current_run.segments[i].frames;
 
-    std::println("Time:  {:.2f} | {}", (double)(total_frames) / 30.0, total_frames);
-    std::println("seg {}/{}  frame {}", current_run.current_segment + 1, NUM_SEGMENTS, current_run.current_frame);
+    const auto pb_total = database::instance.pb.has_value() ? database::instance.pb.value().total_frames() : 0;
+    const auto sob_total = database::instance.best_segments.total_frames();
 
-    const auto sob_frames = database::instance.get_best_segments().total_frames();
-    const auto sob_time = sob_frames / 30.0;
+    std::print("| {:>2} | {:<8.2f} {:>8} | {:<8} {:>8} | {:<8.2f} {:^8} {:>8} | {:<8.2f} {:^8} {:>8} |",
+               "=",
+               (double)(total_frames) / 30.0, total_frames,
+               "--", "--",
+               (double)pb_total / 30.0, pb_total, "",
+               (double)sob_total / 30.0, sob_total, "");
 
-    std::println("sob: {:.2f} {:4}", sob_time, sob_frames);
+    std::println();
+    std::println(line);
 }
 
 void reset()
