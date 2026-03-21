@@ -252,7 +252,7 @@ constexpr const char* CYAN   = "\033[36m";
 constexpr const char* RESET  = "\033[0m";
 // constexpr const char* BOLD   = "\033[1m";
 
-void print_table()
+static void print_table()
 {
     const auto& r = current_run.current_run;
     uint32_t total = 0;
@@ -359,7 +359,7 @@ void print_table()
     }
 }
 
-void print_run()
+static void print_run()
 {
     std::println("\033[2J\033[H");  // clear screen + home
 
@@ -396,7 +396,7 @@ void print_run()
     std::println(line);
 }
 
-void reset()
+static void reset()
 {
     if (current_run.current_run.segments[0].frames > -1)
         database::instance.save_run(current_run.current_run);
@@ -405,7 +405,7 @@ void reset()
     current_run.current_run.started_at = (uint64_t)std::time(NULL);
 }
 
-void split()
+static void split()
 {
     if (current_run.finished) {
         std::println(stderr, "warning: tried to split when finished.");
@@ -420,7 +420,7 @@ void split()
     }
 }
 
-void frame()
+static void frame()
 {
     if (current_run.finished)
         return;
@@ -429,7 +429,7 @@ void frame()
     print_run();
 }
 
-void process_received(const char* buffer, uint32_t received)
+static void process_received(const char* buffer, uint32_t received)
 {
     for(auto i = 0u; i < received; i++) {
         if (buffer[i] == '1')
@@ -441,7 +441,7 @@ void process_received(const char* buffer, uint32_t received)
     }
 }
 
-void socket_thread()
+static void socket_thread()
 {
     int server_fd{-1}, client_fd{-1};
     struct sockaddr_in server_addr{}, client_addr{};
@@ -487,9 +487,52 @@ void socket_thread()
     close(server_fd);
 }
 
-int main()
+static bool write_csv()
+{
+    auto csv = fopen("runs.csv", "w");
+    if (!csv) {
+        std::println(stderr, "failed to open csv");
+        return false;
+    }
+
+    const char* a = "started_at,did_finish,1,2,3,4,5,6,7,8,9,10";
+
+    fwrite(a, strlen(a), 1, csv);
+
+    for(const auto& r : database::instance.runs) {
+        fwrite("\n", 1, 1, csv);
+        std::string line = std::format("{},{},{},{},{},{},{},{},{},{},{},{}",
+                                       r.started_at,
+                                       r.did_finish,
+                                       r.segments[0].frames,
+                                       r.segments[1].frames,
+                                       r.segments[2].frames,
+                                       r.segments[3].frames,
+                                       r.segments[4].frames,
+                                       r.segments[5].frames,
+                                       r.segments[6].frames,
+                                       r.segments[7].frames,
+                                       r.segments[8].frames,
+                                       r.segments[9].frames);
+
+        fwrite(line.c_str(), line.size(), 1, csv);
+    }
+
+    fclose(csv);
+    std::println(stderr, "Wrote csv file");
+
+    return true;
+}
+
+int main(int argc, const char* argv[])
 {
     database::instance.load_from_disk();
+
+    std::println("{}",argc);
+
+    if (argc == 2 && std::string{ argv[1] } == "--csv")
+        return write_csv() ? 0 : 1;
+
     socket_thread();
     database::instance.save_to_disk();
 }
